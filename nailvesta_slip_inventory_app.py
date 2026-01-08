@@ -37,8 +37,6 @@ PINK_CSS = """
   --nv-border:rgba(255,77,142,.18);
   --nv-shadow:0 10px 30px rgba(255,77,142,.10);
 }
-
-/* App background */
 .stApp{
   background:
     radial-gradient(1200px 600px at 15% 10%, rgba(255,77,142,.14), transparent 55%),
@@ -46,29 +44,10 @@ PINK_CSS = """
     linear-gradient(180deg, var(--nv-pink-50), #ffffff 55%);
   color: var(--nv-text);
 }
+.block-container{ padding-top: 1.2rem; padding-bottom: 2rem; }
+h1, h2, h3{ color: var(--nv-text) !important; letter-spacing: .2px; }
+h1{ font-weight: 800; } h2{ font-weight: 750; } h3{ font-weight: 700; }
 
-/* Reduce default padding a bit */
-.block-container{
-  padding-top: 1.2rem;
-  padding-bottom: 2rem;
-}
-
-/* Headers */
-h1, h2, h3{
-  color: var(--nv-text) !important;
-  letter-spacing: .2px;
-}
-h1{
-  font-weight: 800;
-}
-h2{
-  font-weight: 750;
-}
-h3{
-  font-weight: 700;
-}
-
-/* Cards */
 .nv-card{
   background: var(--nv-card);
   border: 1px solid var(--nv-border);
@@ -77,10 +56,7 @@ h3{
   padding: 16px 16px;
 }
 .nv-banner{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:14px;
+  display:flex; align-items:center; justify-content:space-between; gap:14px;
   padding: 18px 18px;
   border-radius: 22px;
   background:
@@ -89,21 +65,10 @@ h3{
   border: 1px solid var(--nv-border);
   box-shadow: var(--nv-shadow);
 }
-.nv-banner-title{
-  font-size: 26px;
-  font-weight: 850;
-  margin: 0;
-}
-.nv-banner-sub{
-  margin: 4px 0 0 0;
-  color: var(--nv-muted);
-  font-size: 13.5px;
-  line-height: 1.45;
-}
+.nv-banner-title{ font-size: 26px; font-weight: 850; margin: 0; }
+.nv-banner-sub{ margin: 4px 0 0 0; color: var(--nv-muted); font-size: 13.5px; line-height: 1.45; }
 .nv-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
+  display:inline-flex; align-items:center; gap:10px;
   padding: 10px 12px;
   border-radius: 999px;
   background: rgba(255,77,142,.10);
@@ -113,12 +78,8 @@ h3{
   font-size: 13px;
   white-space: nowrap;
 }
-.nv-mini{
-  color: var(--nv-muted);
-  font-size: 12.5px;
-}
+.nv-mini{ color: var(--nv-muted); font-size: 12.5px; }
 
-/* Buttons */
 .stButton button, .stDownloadButton button{
   background: linear-gradient(180deg, var(--nv-pink-500), var(--nv-pink-600)) !important;
   color: white !important;
@@ -128,42 +89,27 @@ h3{
   font-weight: 700 !important;
   box-shadow: 0 8px 18px rgba(255,77,142,.25) !important;
 }
-.stButton button:hover, .stDownloadButton button:hover{
-  filter: brightness(1.03);
-  transform: translateY(-1px);
-}
-.stButton button:active, .stDownloadButton button:active{
-  transform: translateY(0px);
-}
+.stButton button:hover, .stDownloadButton button:hover{ filter: brightness(1.03); transform: translateY(-1px); }
+.stButton button:active, .stDownloadButton button:active{ transform: translateY(0px); }
 
-/* Selectbox / uploader */
 div[data-testid="stFileUploader"] section{
   border: 1px dashed rgba(255,77,142,.35) !important;
   border-radius: 14px !important;
   background: rgba(255,241,246,.55) !important;
 }
-div[data-testid="stSelectbox"] > div{
-  border-radius: 12px !important;
-}
-div[data-testid="stMultiSelect"] > div{
-  border-radius: 12px !important;
-}
+div[data-testid="stSelectbox"] > div{ border-radius: 12px !important; }
+div[data-testid="stMultiSelect"] > div{ border-radius: 12px !important; }
 
-/* Dataframe container rounding */
 div[data-testid="stDataFrame"]{
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255,77,142,.16);
 }
-
-/* Info/Success/Warning */
 div[data-testid="stAlert"]{
   border-radius: 14px;
   border: 1px solid rgba(255,77,142,.18);
   box-shadow: 0 8px 18px rgba(255,77,142,.08);
 }
-
-/* Code block */
 pre{
   border-radius: 14px !important;
   border: 1px solid rgba(255,77,142,.14) !important;
@@ -172,7 +118,6 @@ pre{
 """
 st.markdown(PINK_CSS, unsafe_allow_html=True)
 
-# A tiny "My Melody-inspired" bow SVG (no character art)
 BOW_SVG = """
 <svg width="56" height="36" viewBox="0 0 56 36" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -205,7 +150,6 @@ st.markdown(
 """,
     unsafe_allow_html=True
 )
-
 st.write("")
 
 # =========================
@@ -223,7 +167,7 @@ with colL:
 with colR:
     st.markdown('<div class="nv-card">', unsafe_allow_html=True)
     st.subheader("设置")
-    st.markdown('<div class="nv-mini">库存列可在下方自动识别失败时手动选择。</div>', unsafe_allow_html=True)
+    st.markdown('<div class="nv-mini">库存列在处理阶段选择（保持原始 CSV 行顺序输出）。</div>', unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
 selected_pdfs = []
@@ -278,7 +222,7 @@ if selected_pdfs and stock_file:
     st.success("文件已上传，开始处理。")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # -------- 3.1 Load stock --------
+    # -------- 3.1 Load stock (KEEP ORIGINAL ORDER) --------
     stock_df = pd.read_csv(stock_file)
     stock_df.columns = [str(c).strip() for c in stock_df.columns]
 
@@ -286,13 +230,30 @@ if selected_pdfs and stock_file:
         st.error("库存表缺少列：SKU编码")
         st.stop()
 
+    # ✅ 记录原始顺序（最终展示按此顺序）
+    stock_df["_row_order"] = range(len(stock_df))
+
+    # 🚫 不允许重复 SKU：如果有，直接提示并停止（避免 Sold 被重复扣减）
+    dup = stock_df["SKU编码"].duplicated(keep=False)
+    if dup.any():
+        dup_list = (
+            stock_df.loc[dup, "SKU编码"]
+            .astype(str)
+            .value_counts()
+            .head(50)
+            .to_dict()
+        )
+        st.error("检测到库存表存在重复 SKU编码，已停止运行（为避免重复扣减库存）。")
+        st.caption("请先修正库存表，使 SKU编码 唯一。下面是前 50 个重复 SKU（SKU: 重复次数）：")
+        st.json(dup_list)
+        st.stop()
+
     # pick stock column
-    candidate_cols = [c for c in stock_df.columns if c != "SKU编码"]
+    candidate_cols = [c for c in stock_df.columns if c not in ["SKU编码", "_row_order"]]
     if not candidate_cols:
         st.error("库存表没有可用的库存列（除 SKU编码 外至少需要一列）")
         st.stop()
 
-    # try to auto-pick
     common_stock_names = ["Stock", "库存", "Current Stock", "Old Stock", "现有库存"]
     default_stock_col = None
     for c in common_stock_names:
@@ -307,13 +268,6 @@ if selected_pdfs and stock_file:
     )
 
     stock_df[stock_col] = pd.to_numeric(stock_df[stock_col], errors="coerce").fillna(0).astype(int)
-
-    # detect duplicate SKUs & auto-merge (prevents double counting)
-    dup_counts = stock_df["SKU编码"].value_counts()
-    dup_skus = dup_counts[dup_counts > 1].index.tolist()
-    if dup_skus:
-        st.warning(f"检测到库存表存在重复 SKU，将自动合并汇总：共 {len(dup_skus)} 个 SKU。")
-        stock_df = stock_df.groupby("SKU编码", as_index=False)[stock_col].sum()
 
     # -------- 3.2 Parse PDFs --------
     pdf_audit_rows = []
@@ -348,31 +302,41 @@ if selected_pdfs and stock_file:
     st.subheader("PDF 提取对账（独立站 Slip：逐件明细口径）")
     st.dataframe(pdf_audit_df, use_container_width=True)
 
-    # -------- 3.3 Update inventory --------
+    # -------- 3.3 Update inventory (KEEP ORIGINAL ORDER) --------
     stock_df["Sold"] = stock_df["SKU编码"].map(sku_counts_all).fillna(0).astype(int)
     stock_df["New Stock"] = stock_df[stock_col] - stock_df["Sold"]
+
+    # ✅ 按原始顺序输出（虽然没排序过，但强制更安心）
+    stock_df = stock_df.sort_values("_row_order", kind="stable").reset_index(drop=True)
 
     summary_df = stock_df[["SKU编码", stock_col, "Sold", "New Stock"]].copy()
     summary_df.columns = ["SKU", "Old Stock", "Sold Qty", "New Stock"]
     summary_df.index += 1
 
-    total_row = ["—",
-                 int(summary_df["Old Stock"].sum()),
-                 int(summary_df["Sold Qty"].sum()),
-                 int(summary_df["New Stock"].sum())]
-    summary_df.loc["合计"] = total_row
+    summary_df.loc["合计"] = [
+        "—",
+        int(summary_df["Old Stock"].sum()),
+        int(summary_df["Sold Qty"].sum()),
+        int(summary_df["New Stock"].sum()),
+    ]
 
-    st.subheader("库存更新结果")
+    st.subheader("库存更新结果（保持库存 CSV 原始顺序）")
     st.dataframe(summary_df, use_container_width=True)
 
     total_sold_from_pdf = int(sum(sku_counts_all.values()))
     st.markdown('<div class="nv-card">', unsafe_allow_html=True)
-    st.markdown(f"<div style='font-size:16px;font-weight:750;color:var(--nv-text);'>本次提取 Sold 总件数：{total_sold_from_pdf}</div>", unsafe_allow_html=True)
-    st.markdown("<div class='nv-mini'>Sold 总件数以 PDF 提取明细为准；库存表若有重复 SKU 已自动合并，避免重复扣减。</div>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='font-size:16px;font-weight:750;color:var(--nv-text);'>本次提取 Sold 总件数：{total_sold_from_pdf}</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<div class='nv-mini'>Sold 总件数以 PDF 提取明细为准；如库存表存在重复 SKU，本程序会直接停止并提示。</div>",
+        unsafe_allow_html=True
+    )
     st.markdown("</div>", unsafe_allow_html=True)
 
     # -------- 3.4 Copy New Stock --------
-    st.subheader("一键复制 New Stock")
+    st.subheader("一键复制 New Stock（按库存 CSV 顺序）")
     new_stock_text = "\n".join(summary_df.iloc[:-1]["New Stock"].astype(int).astype(str).tolist())
     st.code(new_stock_text, language="text")
 
