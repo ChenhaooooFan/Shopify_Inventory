@@ -1,61 +1,246 @@
 import streamlit as st
 import pandas as pd
 import re
-import fitz  # PyMuPDF
 from collections import defaultdict
 from io import BytesIO
 from datetime import datetime
 import os
 
-# =========================
-# 0) UI
-# =========================
-st.set_page_config(page_title="NailVesta 库存系统（独立站 Slip PDF）", layout="centered")
-st.title("ColorFour Inventory 系统（独立站 Slip PDF → Sold → 更新库存 + 达人换货）")
+# -----------------------------
+# Optional dependency: PyMuPDF
+# -----------------------------
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    st.set_page_config(page_title="NailVesta 库存系统（独立站 Slip PDF）", layout="centered")
+    st.error("缺少依赖 PyMuPDF（fitz）。请在 requirements.txt 中加入 PyMuPDF 并重新部署 / 重启应用。")
+    st.stop()
 
-st.caption("适用文件：独立站 Slip/Invoice PDF（逐件明细），库存 CSV（SKU编码 + 单一库存列），可选达人换货表（每行=1件）。")
+# =========================
+# 0) Page + Style (Pink theme)
+# =========================
+st.set_page_config(page_title="NailVesta 库存系统（独立站 Slip PDF）", layout="wide")
 
-pdf_files = st.file_uploader("上传独立站 Slip PDF（可多选）", type=["pdf"], accept_multiple_files=True)
-stock_file = st.file_uploader("上传库存表 CSV", type=["csv"])
+PINK_CSS = """
+<style>
+:root{
+  --nv-pink-50:#fff1f6;
+  --nv-pink-100:#ffe4ee;
+  --nv-pink-200:#ffc7da;
+  --nv-pink-300:#ff9dbf;
+  --nv-pink-400:#ff73a4;
+  --nv-pink-500:#ff4d8e;
+  --nv-pink-600:#e63b7a;
+  --nv-text:#2a1b22;
+  --nv-muted:#6b5b63;
+  --nv-card:#ffffff;
+  --nv-border:rgba(255,77,142,.18);
+  --nv-shadow:0 10px 30px rgba(255,77,142,.10);
+}
+
+/* App background */
+.stApp{
+  background:
+    radial-gradient(1200px 600px at 15% 10%, rgba(255,77,142,.14), transparent 55%),
+    radial-gradient(900px 500px at 85% 20%, rgba(255,157,191,.18), transparent 55%),
+    linear-gradient(180deg, var(--nv-pink-50), #ffffff 55%);
+  color: var(--nv-text);
+}
+
+/* Reduce default padding a bit */
+.block-container{
+  padding-top: 1.2rem;
+  padding-bottom: 2rem;
+}
+
+/* Headers */
+h1, h2, h3{
+  color: var(--nv-text) !important;
+  letter-spacing: .2px;
+}
+h1{
+  font-weight: 800;
+}
+h2{
+  font-weight: 750;
+}
+h3{
+  font-weight: 700;
+}
+
+/* Cards */
+.nv-card{
+  background: var(--nv-card);
+  border: 1px solid var(--nv-border);
+  box-shadow: var(--nv-shadow);
+  border-radius: 18px;
+  padding: 16px 16px;
+}
+.nv-banner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding: 18px 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255,77,142,.16), rgba(255,157,191,.16)),
+    linear-gradient(180deg, #fff, #fff);
+  border: 1px solid var(--nv-border);
+  box-shadow: var(--nv-shadow);
+}
+.nv-banner-title{
+  font-size: 26px;
+  font-weight: 850;
+  margin: 0;
+}
+.nv-banner-sub{
+  margin: 4px 0 0 0;
+  color: var(--nv-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.nv-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: rgba(255,77,142,.10);
+  border: 1px solid rgba(255,77,142,.20);
+  color: var(--nv-text);
+  font-weight: 650;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.nv-mini{
+  color: var(--nv-muted);
+  font-size: 12.5px;
+}
+
+/* Buttons */
+.stButton button, .stDownloadButton button{
+  background: linear-gradient(180deg, var(--nv-pink-500), var(--nv-pink-600)) !important;
+  color: white !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  padding: 0.65rem 1rem !important;
+  font-weight: 700 !important;
+  box-shadow: 0 8px 18px rgba(255,77,142,.25) !important;
+}
+.stButton button:hover, .stDownloadButton button:hover{
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+}
+.stButton button:active, .stDownloadButton button:active{
+  transform: translateY(0px);
+}
+
+/* Selectbox / uploader */
+div[data-testid="stFileUploader"] section{
+  border: 1px dashed rgba(255,77,142,.35) !important;
+  border-radius: 14px !important;
+  background: rgba(255,241,246,.55) !important;
+}
+div[data-testid="stSelectbox"] > div{
+  border-radius: 12px !important;
+}
+div[data-testid="stMultiSelect"] > div{
+  border-radius: 12px !important;
+}
+
+/* Dataframe container rounding */
+div[data-testid="stDataFrame"]{
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255,77,142,.16);
+}
+
+/* Info/Success/Warning */
+div[data-testid="stAlert"]{
+  border-radius: 14px;
+  border: 1px solid rgba(255,77,142,.18);
+  box-shadow: 0 8px 18px rgba(255,77,142,.08);
+}
+
+/* Code block */
+pre{
+  border-radius: 14px !important;
+  border: 1px solid rgba(255,77,142,.14) !important;
+}
+</style>
+"""
+st.markdown(PINK_CSS, unsafe_allow_html=True)
+
+# A tiny "My Melody-inspired" bow SVG (no character art)
+BOW_SVG = """
+<svg width="56" height="36" viewBox="0 0 56 36" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff73a4"/>
+      <stop offset="1" stop-color="#ff4d8e"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 18c-8-10-16-10-16-3 0 7 8 10 16 3z" fill="url(#g)" opacity="0.92"/>
+  <path d="M38 18c8-10 16-10 16-3 0 7-8 10-16 3z" fill="url(#g)" opacity="0.92"/>
+  <ellipse cx="28" cy="18" rx="7.5" ry="6.3" fill="#ffd1e3" stroke="#ff4d8e" stroke-width="1.2"/>
+  <circle cx="28" cy="18" r="2.3" fill="#ff4d8e"/>
+</svg>
+"""
+
+st.markdown(
+    f"""
+<div class="nv-banner">
+  <div>
+    <div class="nv-banner-title">ColorFour Inventory（Slip PDF 版本）</div>
+    <div class="nv-banner-sub">
+      粉色主题 · My Melody 风格点缀（蝴蝶结元素）<br/>
+      流程：Slip PDF 提取 Sold → 映射库存（SKU编码）→ 计算 New Stock → 导出 Excel
+    </div>
+  </div>
+  <div class="nv-badge">
+    {BOW_SVG}
+    <span>Pink Mode</span>
+  </div>
+</div>
+""",
+    unsafe_allow_html=True
+)
+
+st.write("")
+
+# =========================
+# 1) Uploaders
+# =========================
+colL, colR = st.columns([1.2, 1.0], gap="large")
+with colL:
+    st.markdown('<div class="nv-card">', unsafe_allow_html=True)
+    st.subheader("上传文件")
+    pdf_files = st.file_uploader("上传独立站 Slip/Invoice PDF（可多选）", type=["pdf"], accept_multiple_files=True)
+    stock_file = st.file_uploader("上传库存表 CSV（包含 SKU编码 + 库存列）", type=["csv"])
+    st.markdown('<div class="nv-mini">提示：Slip PDF 为逐件明细口径，不需要 Item quantity / bundle / NM001。</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with colR:
+    st.markdown('<div class="nv-card">', unsafe_allow_html=True)
+    st.subheader("设置")
+    st.markdown('<div class="nv-mini">库存列可在下方自动识别失败时手动选择。</div>', unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 selected_pdfs = []
 if pdf_files:
     selected_names = st.multiselect(
         "选择要参与统计的 Slip PDF（默认全选）",
         options=[f.name for f in pdf_files],
-        default=[f.name for f in pdf_files]
+        default=[f.name for f in pdf_files],
     )
     selected_pdfs = [f for f in pdf_files if f.name in selected_names]
 
-# —— 达人换货开关 ——（逐行一件）
-if "show_exchange" not in st.session_state:
-    st.session_state.show_exchange = False
-if st.button("有达人换货吗？"):
-    st.session_state.show_exchange = True
-
-creator_swap_df = None
-if st.session_state.show_exchange:
-    st.info("上传【达人换货统计表】（CSV/XLSX）：每行代表发货了 1 件。选择“原SKU列”和“新SKU列”。系统会：原SKU Sold -1、库存 +1；新SKU Sold +1、库存 -1，并生成对账表。")
-    creator_swap_file = st.file_uploader("上传达人换货统计表（每行=1件）", type=["csv", "xlsx"], key="creator_swap")
-    if creator_swap_file:
-        if creator_swap_file.name.lower().endswith(".csv"):
-            creator_swap_df = pd.read_csv(creator_swap_file)
-        else:
-            creator_swap_df = pd.read_excel(creator_swap_file)
-        creator_swap_df.columns = [str(c).strip() for c in creator_swap_df.columns]
-        st.success("达人换货统计表已上传")
-
 # =========================
-# 1) 解析：独立站 Slip PDF（逐件明细）
+# 2) PDF parsing (Slip)
 # =========================
-
-# SKU 形态：ABC123-S/M/L（你当前 slip 就是这种）
 SKU_RE = re.compile(r"\b([A-Z]{3}\d{3}-[SML])\b")
-
-# 订单号（用于粗略统计每个 PDF 有多少单）
 ORDER_RE = re.compile(r"\bOrder\s*#\s*([A-Za-z0-9_-]+)\b", re.I)
-
-# “qty of total” —— 预留更鲁棒：如果未来 slip 出现 2 of 2
 OF_RE = re.compile(r"\b(\d+)\s+of\s+(\d+)\b", re.I)
 
 def normalize_text(t: str) -> str:
@@ -65,51 +250,50 @@ def normalize_text(t: str) -> str:
 
 def parse_slip_pdf(file_bytes: bytes):
     """
-    返回：
-      sku_counts: defaultdict(int)  # SKU -> qty
-      extracted_units: int
-      order_ids: set[str]
-    规则：
-      - 匹配到每个 SKU（ABC123-S/M/L）就计入 1
-      - 若 SKU 附近出现 '2 of 2' 这种格式，则取前面的数量作为 qty（默认 1）
+    Slip PDF（逐件明细）提取：
+      - SKU 形态：ABC123-S/M/L
+      - 默认 qty=1；若 SKU 附近出现 '2 of 2' 这种格式则取前面的数量
     """
     doc = fitz.open(stream=file_bytes, filetype="pdf")
     pages_text = [p.get_text("text") for p in doc]
-    text_raw = "\n".join(pages_text)
-    text = normalize_text(text_raw)
+    text = normalize_text("\n".join(pages_text))
 
     order_ids = set(ORDER_RE.findall(text))
-
     sku_counts = defaultdict(int)
+
     for m in SKU_RE.finditer(text):
         sku = m.group(1).strip()
-
-        # look-ahead 80 chars 找 "x of y"；找不到就默认 1
         after = text[m.end(): m.end() + 80]
         mm = OF_RE.search(after)
         qty = int(mm.group(1)) if mm else 1
-
         sku_counts[sku] += qty
 
-    extracted_units = int(sum(sku_counts.values()))
-    return sku_counts, extracted_units, order_ids
+    units = int(sum(sku_counts.values()))
+    return sku_counts, units, order_ids
 
 # =========================
-# 2) 主流程
+# 3) Main
 # =========================
 if selected_pdfs and stock_file:
-    st.success("文件上传成功，开始处理...")
+    st.markdown('<div class="nv-card">', unsafe_allow_html=True)
+    st.success("文件已上传，开始处理。")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------- 2.1 读取库存 CSV ----------
+    # -------- 3.1 Load stock --------
     stock_df = pd.read_csv(stock_file)
     stock_df.columns = [str(c).strip() for c in stock_df.columns]
 
-    # 默认列名：SKU编码 + 单一库存列（如果库存列不止一个，允许你在 UI 选）
     if "SKU编码" not in stock_df.columns:
         st.error("库存表缺少列：SKU编码")
         st.stop()
 
-    # 选择库存列：优先找常见名字，否则让你选第一个数值列
+    # pick stock column
+    candidate_cols = [c for c in stock_df.columns if c != "SKU编码"]
+    if not candidate_cols:
+        st.error("库存表没有可用的库存列（除 SKU编码 外至少需要一列）")
+        st.stop()
+
+    # try to auto-pick
     common_stock_names = ["Stock", "库存", "Current Stock", "Old Stock", "现有库存"]
     default_stock_col = None
     for c in common_stock_names:
@@ -117,22 +301,22 @@ if selected_pdfs and stock_file:
             default_stock_col = c
             break
 
-    # 候选库存列：除 SKU编码 外的列
-    candidate_cols = [c for c in stock_df.columns if c != "SKU编码"]
-    if not candidate_cols:
-        st.error("库存表没有可用的库存列（除 SKU编码 外至少需要一列）")
-        st.stop()
-
     stock_col = st.selectbox(
         "选择库存列（Old Stock）",
         options=candidate_cols,
-        index=(candidate_cols.index(default_stock_col) if default_stock_col in candidate_cols else 0)
+        index=(candidate_cols.index(default_stock_col) if default_stock_col in candidate_cols else 0),
     )
 
-    # 确保库存列可计算
     stock_df[stock_col] = pd.to_numeric(stock_df[stock_col], errors="coerce").fillna(0).astype(int)
 
-    # ---------- 2.2 解析所有 PDF ----------
+    # detect duplicate SKUs & auto-merge (prevents double counting)
+    dup_counts = stock_df["SKU编码"].value_counts()
+    dup_skus = dup_counts[dup_counts > 1].index.tolist()
+    if dup_skus:
+        st.warning(f"检测到库存表存在重复 SKU，将自动合并汇总：共 {len(dup_skus)} 个 SKU。")
+        stock_df = stock_df.groupby("SKU编码", as_index=False)[stock_col].sum()
+
+    # -------- 3.2 Parse PDFs --------
     pdf_audit_rows = []
     sku_counts_all = defaultdict(int)
 
@@ -152,160 +336,68 @@ if selected_pdfs and stock_file:
 
     pdf_audit_df = pd.DataFrame(pdf_audit_rows)
     if not pdf_audit_df.empty:
-        total_row = {
-            "PDF文件": "合计",
-            "识别订单数（Order #）": int(pdf_audit_df["识别订单数（Order #）"].sum()),
-            "提取SKU种类数": int(pdf_audit_df["提取SKU种类数"].sum()),
-            "提取件数（Sold Units）": int(pdf_audit_df["提取件数（Sold Units）"].sum()),
-        }
-        pdf_audit_df = pd.concat([pdf_audit_df, pd.DataFrame([total_row])], ignore_index=True)
+        pdf_audit_df = pd.concat(
+            [pdf_audit_df, pd.DataFrame([{
+                "PDF文件": "合计",
+                "识别订单数（Order #）": int(pdf_audit_df["识别订单数（Order #）"].sum()),
+                "提取SKU种类数": int(pdf_audit_df["提取SKU种类数"].sum()),
+                "提取件数（Sold Units）": int(pdf_audit_df["提取件数（Sold Units）"].sum()),
+            }])],
+            ignore_index=True
+        )
 
     st.subheader("PDF 提取对账（独立站 Slip：逐件明细口径）")
     st.dataframe(pdf_audit_df, use_container_width=True)
 
-    # ---------- 2.3 可选：达人换货（逐行一件） ----------
-    recon_df = None
-    stock_delta_df = None
-    swap_log_df = None
-
-    if creator_swap_df is not None and not creator_swap_df.empty:
-        st.subheader("达人换货（逐行一件）")
-
-        colA, colB = st.columns(2)
-        with colA:
-            original_col = st.selectbox("选择原SKU列（原款式）", options=list(creator_swap_df.columns))
-        with colB:
-            new_col = st.selectbox("选择新SKU列（发货款式）", options=list(creator_swap_df.columns))
-
-        if original_col and new_col:
-            sold_before = dict(sku_counts_all)
-
-            applied_rows = 0
-            missing_in_sold = 0
-            log_rows = []
-
-            for _, row in creator_swap_df.iterrows():
-                original_sku = str(row[original_col]).strip() if pd.notna(row[original_col]) else ""
-                new_sku = str(row[new_col]).strip() if pd.notna(row[new_col]) else ""
-
-                found_in_sold = False
-
-                # Sold 修正：原 -1（仅当当日提取中存在可扣），新 +1（无条件）
-                if original_sku:
-                    if sku_counts_all.get(original_sku, 0) > 0:
-                        sku_counts_all[original_sku] -= 1
-                        if sku_counts_all[original_sku] == 0:
-                            del sku_counts_all[original_sku]
-                        found_in_sold = True
-                    else:
-                        missing_in_sold += 1
-
-                if new_sku:
-                    sku_counts_all[new_sku] += 1
-
-                # 库存修正：原 +1，新 -1（只对库存表中存在的 SKU 行生效）
-                if original_sku:
-                    stock_df.loc[stock_df["SKU编码"] == original_sku, stock_col] += 1
-                if new_sku:
-                    stock_df.loc[stock_df["SKU编码"] == new_sku, stock_col] -= 1
-
-                applied_rows += 1
-                log_rows.append({
-                    "原SKU": original_sku,
-                    "新SKU": new_sku,
-                    "原SKU是否在当日提取中找到": "是" if found_in_sold else "否"
-                })
-
-            swap_log_df = pd.DataFrame(log_rows)
-
-            # 统计 delta
-            dec_counts = swap_log_df["原SKU"].value_counts().rename("原SKU减少次数") if not swap_log_df.empty else pd.Series(dtype=int)
-            inc_counts = swap_log_df["新SKU"].value_counts().rename("新SKU增加次数") if not swap_log_df.empty else pd.Series(dtype=int)
-
-            delta_sold = pd.concat([
-                -dec_counts.rename("Delta"),
-                inc_counts.rename("Delta")
-            ], axis=0).groupby(level=0).sum().sort_index()
-
-            idx = sorted(delta_sold.index.tolist())
-            recon_df = pd.DataFrame({
-                "Before Sold": [sold_before.get(k, 0) for k in idx],
-                "Delta from Swap": [int(delta_sold.get(k, 0)) for k in idx],
-                "After Sold": [sku_counts_all.get(k, 0) for k in idx],
-            }, index=idx)
-            recon_df["OK?"] = recon_df["After Sold"] == (recon_df["Before Sold"] + recon_df["Delta from Swap"])
-
-            stock_delta = pd.concat([
-                dec_counts.rename("Stock Delta(原+1)"),
-                (-inc_counts).rename("Stock Delta(新-1)")
-            ], axis=0).groupby(level=0).sum().sort_values(ascending=False)
-            stock_delta_df = stock_delta.to_frame(name="预期库存变动量（+原 / −新）")
-
-            msg_tail = "" if missing_in_sold == 0 else f"；其中 {missing_in_sold} 行原SKU未在当日提取中找到（Sold 无法逐件 −1，但库存仍会按规则 +1，新SKU 仍会 +1）"
-            st.success(f"达人换货处理完成：共应用 {applied_rows} 行{msg_tail}")
-
-            c1, c2 = st.columns(2)
-            with c1:
-                st.caption("Sold 变动对账（理论 Delta vs 应用前/后）")
-                st.dataframe(recon_df, use_container_width=True)
-            with c2:
-                st.caption("库存预期变动（按达人换货累计）")
-                st.dataframe(stock_delta_df, use_container_width=True)
-
-            st.caption("达人换货明细（前100行）")
-            st.dataframe(swap_log_df.head(100), use_container_width=True)
-
-    # ---------- 2.4 更新库存 ----------
+    # -------- 3.3 Update inventory --------
     stock_df["Sold"] = stock_df["SKU编码"].map(sku_counts_all).fillna(0).astype(int)
     stock_df["New Stock"] = stock_df[stock_col] - stock_df["Sold"]
 
     summary_df = stock_df[["SKU编码", stock_col, "Sold", "New Stock"]].copy()
     summary_df.columns = ["SKU", "Old Stock", "Sold Qty", "New Stock"]
     summary_df.index += 1
-    summary_df.loc["合计"] = ["—", int(summary_df["Old Stock"].sum()), int(summary_df["Sold Qty"].sum()), int(summary_df["New Stock"].sum())]
+
+    total_row = ["—",
+                 int(summary_df["Old Stock"].sum()),
+                 int(summary_df["Sold Qty"].sum()),
+                 int(summary_df["New Stock"].sum())]
+    summary_df.loc["合计"] = total_row
 
     st.subheader("库存更新结果")
     st.dataframe(summary_df, use_container_width=True)
 
-    total_sold = int(summary_df.loc["合计", "Sold Qty"])
-    st.info(f"本次提取 Sold 总件数：{total_sold}")
+    total_sold_from_pdf = int(sum(sku_counts_all.values()))
+    st.markdown('<div class="nv-card">', unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:16px;font-weight:750;color:var(--nv-text);'>本次提取 Sold 总件数：{total_sold_from_pdf}</div>", unsafe_allow_html=True)
+    st.markdown("<div class='nv-mini'>Sold 总件数以 PDF 提取明细为准；库存表若有重复 SKU 已自动合并，避免重复扣减。</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------- 2.5 一键复制 New Stock ----------
+    # -------- 3.4 Copy New Stock --------
     st.subheader("一键复制 New Stock")
     new_stock_text = "\n".join(summary_df.iloc[:-1]["New Stock"].astype(int).astype(str).tolist())
     st.code(new_stock_text, language="text")
 
-    # ---------- 2.6 下载 Excel（多 sheet） ----------
+    # -------- 3.5 Export Excel --------
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         pdf_audit_df.to_excel(writer, sheet_name="PDF_Audit", index=False)
         summary_df.to_excel(writer, sheet_name="Inventory_Update", index_label="序号")
-        if recon_df is not None:
-            recon_df.reset_index().rename(columns={"index": "SKU"}).to_excel(writer, sheet_name="Swap_Recon", index=False)
-        if stock_delta_df is not None:
-            stock_delta_df.reset_index().rename(columns={"index": "SKU"}).to_excel(writer, sheet_name="Swap_Stock_Delta", index=False)
-        if swap_log_df is not None:
-            swap_log_df.to_excel(writer, sheet_name="Swap_Log", index=False)
 
     st.download_button(
         label="下载结果 Excel",
         data=output.getvalue(),
-        file_name="库存更新结果_独立站Slip.xlsx"
+        file_name="库存更新结果_独立站Slip_Pink.xlsx"
     )
 
-    # ---------- 2.7 上传历史记录 ----------
+    # -------- 3.6 Upload history --------
     history_file = "upload_history.csv"
     new_record = {
         "时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "PDF文件": "; ".join([f.name for f in selected_pdfs]),
         "库存文件": stock_file.name,
         "库存列": stock_col,
-        "提取出货数量（Sold Units）": total_sold
+        "提取出货数量（Sold Units）": total_sold_from_pdf
     }
-    if creator_swap_df is not None:
-        new_record["达人换货行数"] = int(len(creator_swap_df))
-    else:
-        new_record["达人换货行数"] = ""
 
     if os.path.exists(history_file):
         history_df = pd.read_csv(history_file)
