@@ -194,7 +194,6 @@ st.markdown(
   <div>
     <div class="nv-banner-title">ColorFour Inventory（Slip PDF 版本）</div>
     <div class="nv-banner-sub">
-      粉色主题 · My Melody 风格点缀（蝴蝶结元素）<br/>
       流程：Slip PDF 提取 Sold → 映射库存（SKU编码）→ 计算 New Stock → 导出 Excel
     </div>
   </div>
